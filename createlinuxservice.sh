@@ -9,58 +9,58 @@ do
         restart) RESTARTTIME=${OPTARG};;
     esac
 done
-mkdir /usr/services
-mkdir "/usr/services/${SERVICE_NAME}"
-#Make the service start and stop bash scripts
-echo -en '#!/bin/bash\n
-'${STARTCOMMAND}' > /var/log/'${SERVICE_NAME}'_service.log' > /usr/services/${SERVICE_NAME}/start.sh 2>&1
-echo -en '#!/bin/bash\n
-pkill -f "'${SERVICE_NAME}'\/start.sh";\n
-pkill -f "'${STOPCOMMAND}'"; echo service stopped  > /var/log/'${SERVICE_NAME}'_service.log' > /usr/services/${SERVICE_NAME}/stop.sh 2>&1
-chmod a+x /usr/services/${SERVICE_NAME}/start.sh
-chmod a+x /usr/services/${SERVICE_NAME}/stop.sh
-#Make the service daemon definition
-echo -en '[Unit]\n
-Description='${SERVICE_NAME}' service\n
-After=network.target\n
-\n
-[Service]\n
-Type=simple\n
-ExecStart=/bin/bash /usr/services/'${SERVICE_NAME}'/start.sh\n
-ExecStop=/bin/bash /usr/services/'${SERVICE_NAME}'/stop.sh\n
-Restart=always\n
-RestartSec='${RESTARTTIME}'\n
-TimeoutSec=60\n
-RuntimeMaxSec=infinity\n
-PIDFile=/tmp/'${SERVICE_NAME}'.pid\n
-\n
-[Install]\n
-WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}.service
-#Make the srv-watcher.service daemon definition
-if [ "$WATCHFOLDERS" != "" ]; then echo -en '[Unit]\n
-Description='${SERVICE_NAME}' restarter\n
-After=network.target\n
-\n
-[Service]\n
-Type=oneshot\n
-ExecStart=systemctl restart '${SERVICE_NAME}'.service\n
-\n
-[Install]\n
-WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}-watcher.service; fi
-#Make the srv-watcher.path daemon definition
-if [ "$WATCHFOLDERS" != "" ]; then echo -en '[Path]
-'${WATCHFOLDERS/;/"\nPathModified="}'\n
-\n
-[Install]\n
-WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}-watcher.path; fi;
-#enable the service daemon
-systemctl enable /etc/systemd/system/${SERVICE_NAME}.service
-if [ "$WATCHFOLDERS" != "" ]; then systemctl enable /etc/systemd/system/${SERVICE_NAME}-watcher.path; fi
-if [ "$WATCHFOLDERS" != "" ]; then systemctl start ${SERVICE_NAME}-watcher.path; fi
-systemctl daemon-reload
-touch /var/log/${SERVICE_NAME}_service.log
-chmod 776 /var/log/${SERVICE_NAME}_service.log
-exit
+# mkdir /usr/services
+# mkdir "/usr/services/${SERVICE_NAME}"
+# #Make the service start and stop bash scripts
+# echo -en '#!/bin/bash\n
+# '${STARTCOMMAND}' > /var/log/'${SERVICE_NAME}'_service.log' > /usr/services/${SERVICE_NAME}/start.sh 2>&1
+# echo -en '#!/bin/bash\n
+# pkill -f "'${SERVICE_NAME}'\/start.sh";\n
+# pkill -f "'${STOPCOMMAND}'"; echo service stopped  > /var/log/'${SERVICE_NAME}'_service.log' > /usr/services/${SERVICE_NAME}/stop.sh 2>&1
+# chmod a+x /usr/services/${SERVICE_NAME}/start.sh
+# chmod a+x /usr/services/${SERVICE_NAME}/stop.sh
+# #Make the service daemon definition
+# echo -en '[Unit]\n
+# Description='${SERVICE_NAME}' service\n
+# After=network.target\n
+# \n
+# [Service]\n
+# Type=simple\n
+# ExecStart=/bin/bash /usr/services/'${SERVICE_NAME}'/start.sh\n
+# ExecStop=/bin/bash /usr/services/'${SERVICE_NAME}'/stop.sh\n
+# Restart=always\n
+# RestartSec='${RESTARTTIME}'\n
+# TimeoutSec=60\n
+# RuntimeMaxSec=infinity\n
+# PIDFile=/tmp/'${SERVICE_NAME}'.pid\n
+# \n
+# [Install]\n
+# WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}.service
+# #Make the srv-watcher.service daemon definition
+# if [ "$WATCHFOLDERS" != "" ]; then echo -en '[Unit]\n
+# Description='${SERVICE_NAME}' restarter\n
+# After=network.target\n
+# \n
+# [Service]\n
+# Type=oneshot\n
+# ExecStart=systemctl restart '${SERVICE_NAME}'.service\n
+# \n
+# [Install]\n
+# WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}-watcher.service; fi
+# #Make the srv-watcher.path daemon definition
+# if [ "$WATCHFOLDERS" != "" ]; then echo -en '[Path]
+# '${WATCHFOLDERS/;/"\nPathModified="}'\n
+# \n
+# [Install]\n
+# WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}-watcher.path; fi;
+# #enable the service daemon
+# systemctl enable /etc/systemd/system/${SERVICE_NAME}.service
+# if [ "$WATCHFOLDERS" != "" ]; then systemctl enable /etc/systemd/system/${SERVICE_NAME}-watcher.path; fi
+# if [ "$WATCHFOLDERS" != "" ]; then systemctl start ${SERVICE_NAME}-watcher.path; fi
+# systemctl daemon-reload
+# touch /var/log/${SERVICE_NAME}_service.log
+# chmod 776 /var/log/${SERVICE_NAME}_service.log
+# exit
 
 
 echo '<table>
