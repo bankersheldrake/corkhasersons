@@ -1,0 +1,152 @@
+sudo -s
+SERVICE_NAME="javelin_trunk"
+STARTCOMMAND="/home/pi/.virtualenvs/javelin/bin/python3 -u /home/pi/projects/javelin/dist/server.py --port 5000 --settingsfile /home/pi/projects/debug_settings.json"   #make sure that quotes are escaped ("'"'")
+STOPCOMMAND="\/home\/pi\/projects\/javelin\/dist\/server.py \-\-port 5000"  #escape reserved chars
+WATCHFOLDERS=";/home/pi/projects/javelin/dist/"
+RESTARTTIME="5s"
+
+mkdir /usr/services
+mkdir "/usr/services/${SERVICE_NAME}"
+#Make the service start and stop bash scripts
+echo -en '#!/bin/bash\n
+'${STARTCOMMAND}' > /var/log/'${SERVICE_NAME}'_service.log' > /usr/services/${SERVICE_NAME}/start.sh 2>&1
+echo -en '#!/bin/bash\n
+pkill -f "'${SERVICE_NAME}'\/start.sh";\n
+pkill -f "'${STOPCOMMAND}'"; echo service stopped  > /var/log/'${SERVICE_NAME}'_service.log' > /usr/services/${SERVICE_NAME}/stop.sh 2>&1
+chmod a+x /usr/services/${SERVICE_NAME}/start.sh
+chmod a+x /usr/services/${SERVICE_NAME}/stop.sh
+#Make the service daemon definition
+echo -en '[Unit]\n
+Description='${SERVICE_NAME}' service\n
+After=network.target\n
+\n
+[Service]\n
+Type=simple\n
+ExecStart=/bin/bash /usr/services/'${SERVICE_NAME}'/start.sh\n
+ExecStop=/bin/bash /usr/services/'${SERVICE_NAME}'/stop.sh\n
+Restart=always\n
+RestartSec='${RESTARTTIME}'\n
+TimeoutSec=60\n
+RuntimeMaxSec=infinity\n
+PIDFile=/tmp/'${SERVICE_NAME}'.pid\n
+\n
+[Install]\n
+WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}.service
+#Make the srv-watcher.service daemon definition
+if [ "$WATCHFOLDERS" != "" ]; then echo -en '[Unit]\n
+Description='${SERVICE_NAME}' restarter\n
+After=network.target\n
+\n
+[Service]\n
+Type=oneshot\n
+ExecStart=systemctl restart '${SERVICE_NAME}'.service\n
+\n
+[Install]\n
+WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}-watcher.service; fi
+#Make the srv-watcher.path daemon definition
+if [ "$WATCHFOLDERS" != "" ]; then echo -en '[Path]
+'${WATCHFOLDERS/;/"\nPathModified="}'\n
+\n
+[Install]\n
+WantedBy=multi-user.target' > /etc/systemd/system/${SERVICE_NAME}-watcher.path; fi;
+#enable the service daemon
+systemctl enable /etc/systemd/system/${SERVICE_NAME}.service
+if [ "$WATCHFOLDERS" != "" ]; then systemctl enable /etc/systemd/system/${SERVICE_NAME}-watcher.path; fi
+if [ "$WATCHFOLDERS" != "" ]; then systemctl start ${SERVICE_NAME}-watcher.path; fi
+systemctl daemon-reload
+touch /var/log/${SERVICE_NAME}_service.log
+chmod 776 /var/log/${SERVICE_NAME}_service.log
+exit
+
+
+echo '<table>
+\n<tr>
+\n<td> </td> 
+\n<td> Prod </td> 
+\n</tr>
+\n<tr>
+\n<td> Running on </td> 
+\n<td> 
+\n    
+\n[[raspberrypi4|HOME/raspberrypi4]] 
+\n    
+\n</td> 
+\n
+\n</tr>
+\n<tr>
+\n<td> Service Config </td>
+\n<td> 
+\n    
+\n<table>
+\n<tr>
+\n<td> Type </td> 
+\n<td> service </td>
+\n</tr>
+\n<tr>
+\n<td> Auto-Restart </td> 
+\n<td> '${RESTARTTIME}' </td>
+\n</tr>
+\n<tr>
+\n<td> Watch Folders </td> 
+\n<td> 
+\n<ul>
+\n'${WATCHFOLDERS/;/"</li>\n<li>"}'\n
+\n</ul>
+\n</td>
+\n</tr>
+\n</table>
+\n    
+\n</td>
+\n
+\n
+\n</tr>
+\n    
+\n
+\n    
+\n<tr>
+\n<td> Service Status </td> 
+\n<td> 
+\n
+\n```shell
+\nsudo service '${SERVICE_NAME}' status
+\nsudo service '${SERVICE_NAME}'-watcher status
+\n```
+\n
+\n</td>
+\n</tr>
+\n<tr>
+\n<td> Manual Start </td> 
+\n<td> 
+\n
+\n```shell
+\n/bin/bash /usr/services/'${SERVICE_NAME}'/start.sh
+\n```
+\n
+\n</td>
+\n
+\n</tr>
+\n    
+\n<tr>
+\n<td> CLI Run </td>
+\n<td> 
+\n        
+\n```shell
+\n'${STARTCOMMAND}'
+\n```
+\n
+\n</td>
+\n
+\n</tr>
+\n<tr>
+\n<td> Service Log </td> 
+\n<td>
+\n
+\n```shell
+\ntail -f /var/log/'${SERVICE_NAME}'_service.log
+\n```
+\n
+\n</td> 
+\n
+\n</tr>
+\n</table>'
+
