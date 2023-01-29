@@ -86,13 +86,8 @@ systemctl daemon-reload
 touch "/var/log/${SERVICE_NAME}_service.log"
 chmod 776 "/var/log/${SERVICE_NAME}_service.log"
 
-echo sudo rm "/usr/services/${SERVICE_NAME}/start.sh"
-echo sudo rm "/usr/services/${SERVICE_NAME}/stop.sh"
-echo sudo rm "/etc/systemd/system/${SERVICE_NAME}.service"
-echo sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.service"
-echo sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.path"
-echo sudo rm "/var/log/${SERVICE_NAME}_service.log"
-echo sudo systemctl daemon-reload
+echo 'sudo rm "/usr/services/${SERVICE_NAME}/start.sh" && sudo rm "/usr/services/${SERVICE_NAME}/stop.sh" && sudo rm "/etc/systemd/system/${SERVICE_NAME}.service" && sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.service"sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.path" &&  sudo rm "/var/log/${SERVICE_NAME}_service.log" && sudo systemctl daemon-reload'
+
 
 echo -en '<table>
 \n<tr>
