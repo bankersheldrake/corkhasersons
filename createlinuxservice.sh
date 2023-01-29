@@ -1,10 +1,14 @@
-sudo -s
-SERVICE_NAME="javelin_trunk"
-STARTCOMMAND="/home/pi/.virtualenvs/javelin/bin/python3 -u /home/pi/projects/javelin/dist/server.py --port 5000 --settingsfile /home/pi/projects/debug_settings.json"   #make sure that quotes are escaped ("'"'")
-STOPCOMMAND="\/home\/pi\/projects\/javelin\/dist\/server.py \-\-port 5000"  #escape reserved chars
-WATCHFOLDERS=";/home/pi/projects/javelin/dist/"
-RESTARTTIME="5s"
-
+#!/bin/bash
+while getopts name:start:stop:watch:restart flag
+do
+    case "${flag}" in
+        name) SERVICE_NAME=${OPTARG};;
+        start) STARTCOMMAND=${OPTARG};;
+        stop) STOPCOMMAND=${OPTARG};;
+        watch) WATCHFOLDERS=${OPTARG};;
+        restart) RESTARTTIME=${OPTARG};;
+    esac
+done
 mkdir /usr/services
 mkdir "/usr/services/${SERVICE_NAME}"
 #Make the service start and stop bash scripts
