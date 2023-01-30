@@ -27,7 +27,7 @@ done
 
 mkdir /usr/services
 mkdir "/usr/services/${SERVICE_NAME}"
-#Make the service start and stop bash scripts
+echo Make the service start and stop bash scripts
 echo -en '#!/bin/bash\n'\
     ''${STARTCOMMAND}' > /var/log/'${SERVICE_NAME}'_service.log 2>&1' > "/usr/services/${SERVICE_NAME}/start.sh"
 echo -en '#!/bin/bash\n'\
@@ -35,7 +35,7 @@ echo -en '#!/bin/bash\n'\
     'pkill -f "'${STOPCOMMAND}'"; echo service stopped  > /var/log/'${SERVICE_NAME}'_service.log 2>&1' > "/usr/services/${SERVICE_NAME}/stop.sh" 
 chmod a+x "/usr/services/${SERVICE_NAME}/start.sh"
 chmod a+x "/usr/services/${SERVICE_NAME}/stop.sh"
-#Make the service daemon definition
+echo Make the service daemon definition
 echo -en '[Unit]\n'\
     'Description='${SERVICE_NAME}' service\n'\
     'After=network.target\n'\
@@ -52,7 +52,7 @@ echo -en '[Unit]\n'\
     '\n'\
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}.service"
-#Make the srv-watcher.service daemon definition
+echo Make the srv-watcher.service daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
     echo -en '[Unit]\n'\
@@ -66,7 +66,7 @@ then
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
 fi
-#Make the srv-watcher.path daemon definition
+echo Make the srv-watcher.path daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
     echo -en '[Path]
@@ -75,7 +75,7 @@ then
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.path"; 
 fi;
-#enable the service daemon
+echo enable the service daemon
 systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
