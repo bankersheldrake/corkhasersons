@@ -66,15 +66,15 @@ then
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
 fi
-echo ------------------ here
-echo ${WATCHFOLDERS/;/"\nPathModified="}
-echo ------------------ ereh
+# echo ------------------ here
+# echo ${WATCHFOLDERS//;/"\nPathModified="}
+# echo ------------------ ereh
 
 #Make the srv-watcher.path daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
     echo -en '[Path]
-    '${WATCHFOLDERS/;/"\nPathModified="}'\n'\
+    '${WATCHFOLDERS//;/"\nPathModified="}'\n'\
     '\n'\
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.path"; 
@@ -129,7 +129,7 @@ echo -en '<table>\n'\
 '<td> Watch Folders </td> \n'\
 '<td> \n'\
 '<ul>\n'\
-''${WATCHFOLDERS/;/"</li>\n<li>"}'\n\n'\
+''${WATCHFOLDERS//;/"</li>\n<li>"}'\n\n'\
 '</ul>\n'\
 '</td>\n'\
 '</tr>\n'\
