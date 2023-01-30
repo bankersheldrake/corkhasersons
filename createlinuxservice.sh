@@ -66,6 +66,7 @@ then
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
 fi
+echo ${WATCHFOLDERS/;/"\nPathModified="}
 #Make the srv-watcher.path daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
@@ -79,8 +80,8 @@ fi;
 systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
-    systemctl enable "/etc/systemd/system/${SERVICE_NAME}-watcher.path"; 
-    systemctl start "${SERVICE_NAME}-watcher.path";
+    systemctl enable "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
+    systemctl start "${SERVICE_NAME}-watcher.service";
 fi
 systemctl daemon-reload
 touch "/var/log/${SERVICE_NAME}_service.log"
