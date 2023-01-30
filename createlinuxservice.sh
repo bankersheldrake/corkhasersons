@@ -55,7 +55,7 @@ echo -en '[Unit]\n'\
 #Make the srv-watcher.service daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
-    echo -en '[Unit]\n'^
+    echo -en '[Unit]\n'\
     'Description='${SERVICE_NAME}' restarter\n'\
     'After=network.target\n'\
     '\n'\
