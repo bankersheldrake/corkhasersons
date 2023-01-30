@@ -89,14 +89,6 @@ systemctl daemon-reload
 touch "/var/log/${SERVICE_NAME}_service.log"
 chmod 776 "/var/log/${SERVICE_NAME}_service.log"
 
-echo start the service
-systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
-if [ "$WATCHFOLDERS" != "" ]; 
-then 
-    echo start the watch service
-    systemctl start "${SERVICE_NAME}-watcher.service";
-fi
-
 echo sudo rm "/usr/services/${SERVICE_NAME}/start.sh"
 echo sudo rm "/usr/services/${SERVICE_NAME}/stop.sh"
 echo sudo rm "/etc/systemd/system/${SERVICE_NAME}.service"
@@ -198,3 +190,14 @@ echo -en '<table>\n'\
 
 echo 'created wiki file: /tmp/'${SERVICE_NAME}'_wiki.html'
 
+read -p 'Would you like to start the services (Y/N)?: ' sInput
+IF [ "$sInput" == "Y"]
+then
+    echo start the service
+    systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
+    if [ "$WATCHFOLDERS" != "" ]; 
+    then 
+        echo start the path watch service
+        systemctl start "${SERVICE_NAME}-watcher.service";
+    fi
+fi
