@@ -66,7 +66,10 @@ then
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
 fi
+echo ------------------ here
 echo ${WATCHFOLDERS/;/"\nPathModified="}
+echo ------------------ ereh
+
 #Make the srv-watcher.path daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
