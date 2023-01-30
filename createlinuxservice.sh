@@ -79,9 +79,12 @@ echo enable the service daemon
 systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
+    echo enable the watch daemon
     systemctl enable "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
+    echo start the watch daemon
     systemctl start "${SERVICE_NAME}-watcher.service";
 fi
+echo reload the deamon
 systemctl daemon-reload
 touch "/var/log/${SERVICE_NAME}_service.log"
 chmod 776 "/var/log/${SERVICE_NAME}_service.log"
