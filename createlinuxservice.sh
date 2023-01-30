@@ -75,8 +75,9 @@ then
     '[Install]\n'\
     'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.path"; 
 fi;
-echo enable the service daemon
+echo enable the service daemon "/etc/systemd/system/${SERVICE_NAME}.service"
 systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
+echo enabled the service daemon "/etc/systemd/system/${SERVICE_NAME}.service"
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
     echo enable the watch daemon
