@@ -191,7 +191,7 @@ echo -en '<table>\n'\
 echo 'created wiki file: /tmp/'${SERVICE_NAME}'_wiki.html'
 
 read -p 'Would you like to start the services (Y/N)?: ' sInput
-IF [ "$sInput" == "Y"]
+if [ "$sInput" == "Y" ];
 then
     echo start the service
     systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
@@ -199,5 +199,5 @@ then
     then 
         echo start the path watch service
         systemctl start "${SERVICE_NAME}-watcher.service";
-    fi
+    fi;
 fi
