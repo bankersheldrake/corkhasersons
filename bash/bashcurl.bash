@@ -24,4 +24,4 @@ do
     i=$((i + 1));
 done
 
-curl -X '${BC_METHOD}' '${BC_URL}'   -H 'accept: */*'   -H 'Content-Type: application/json' -H 'Authorization: ${BC_AUTH}' -d '${BC_BODY}'
+curl -X ${BC_METHOD} ${BC_URL}   -H 'accept: */*'   -H 'Content-Type: application/json' -H 'Authorization: '${BC_AUTH} -d ${BC_BODY}
