@@ -53,7 +53,7 @@ do
         fi
         if [ "$RB_GOAHEAD" == "x" ] || [ "$RB_GOAHEAD" == "X" ] || [ "$RB_GOAHEAD" == "f" ] || [ "$RB_GOAHEAD" == "F" ]; then
             RB_FOUNDFILE=1
-            BREAK
+            break
         fi
     done
     RB_CONTINUE=0
