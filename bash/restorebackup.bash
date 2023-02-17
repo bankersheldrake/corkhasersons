@@ -53,10 +53,13 @@ do
         fi
         if [ "$RB_GOAHEAD" == "x" ] || [ "$RB_GOAHEAD" == "X" ] || [ "$RB_GOAHEAD" == "f" ] || [ "$RB_GOAHEAD" == "F" ]; then
             RB_FOUNDFILE=1
+            BREAK
         fi
     done
     RB_CONTINUE=0
     if [ "$RB_FOUNDFILE" == "0" ] && [ "$RB_CHECKEDARCHIVE" == "0" ]; then
+        echo $RB_FOUNDFILE
+        echo $RB_CHECKEDARCHIVE
         read -p 'No matches for '"'""$RB_FILE""'"' in last overwrite. Try other archived backups (Y/N): ' RB_GOAHEAD
         if [ "$RB_GOAHEAD" == "y" ] || [ "$RB_GOAHEAD" == "Y" ]; then
             RB_FIND='sudo find /tmp/bak_success/ -type f -iname '"'""$RB_FILE""'"' | sort -V -r | head -n 10 '
