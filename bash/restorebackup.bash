@@ -39,7 +39,7 @@ do
         dest=/home/pi/prod/sputnik$(echo "$file" | sed 's/.*sputnik//')
         # x=$(echo "$x" | sed 's/:/ /g')
         if [ "$RB_CONFIRM" == "1" ]; then
-            read -p 'Found '$file' -> '$dest'. Do want to continue (Y/F/N/X): ' RB_GOAHEAD
+            read -p 'Found '$file' -> '$dest'. Do want to continue (Y/F/N/X): ' RB_GOAHEAD </dev/tty
         else
             RB_GOAHEAD=Y
         fi
@@ -58,7 +58,7 @@ do
     done
     RB_CONTINUE=0
     if [ "$RB_FOUNDFILE" == "0" ] && [ "$RB_CHECKEDARCHIVE" == "0" ]; then
-        read -p 'No matches for '"'""$RB_FILE""'"' in last overwrite. Try other archived backups (Y/N): ' RB_GOAHEAD
+        read -p 'No matches for '"'""$RB_FILE""'"' in last overwrite. Try other archived backups (Y/N): ' RB_GOAHEAD </dev/tty
         if [ "$RB_GOAHEAD" == "y" ] || [ "$RB_GOAHEAD" == "Y" ]; then
             RB_FIND='sudo find /tmp/bak_success/ -type f -iname '"'""$RB_FILE""'"' | sort -V -r | head -n 10 '
             RB_ROOTDIRESCAPED=\/tmp\/bak_success\/
