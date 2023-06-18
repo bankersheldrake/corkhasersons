@@ -1,0 +1,222 @@
+[
+  {
+    "name": "fnAJAXCall",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnAJAXFetch",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnReadServerFileContents",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "_fnCBGetContents",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnIsEmptyObject",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnLogConsole",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnLogError",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "_fnLog",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnQuerySelector",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnQuerySelectors",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnFormatBytes",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "_fnFormatTime",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnModalJSONViewer",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnFormatJSON",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "_fnFormatJSON_recurse",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnJSONViewCreate",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "createItem",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "createCollapsibleItem",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "handleChildren",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "handleItem",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "parseObject",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnNotifyEventListeners",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnPushBostonEvent",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnGetCookie",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnSetCookies",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnIsTrue",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnTimestamp",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "timeString2ms",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnTimeStringToDate",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnParseVariableToDate",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnValidateJWT",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnJSONParse",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnValidateElementIDs",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnValidAPIResponse",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnValidAJAXOutcome",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnCopyToClipboard",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "XXfnCompareArrayElements",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnCompareArrayElements",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnCheckDOMLoaded",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnFuncThrottle",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnFuncOnlyRunOnce",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnDebounceFunc",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnHandleElementVisibility",
+    "docstring": "",
+    "parameters": []
+  },
+  {
+    "name": "fnObserveElement",
+    "docstring": "",
+    "parameters": []
+  }
+]
