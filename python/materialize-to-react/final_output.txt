@@ -1,0 +1,150 @@
+Additional text before
+<main>
+<div className="navbar-fixed contains-tiny">
+<nav className="tiny" style="filter: brightness(85%)">
+<div className="nav-wrapper">
+<div className="row">
+<div className="col s9">
+<ul className="left">
+<li><a href="#"><i className="material-icons">info</i></a></li>
+</ul>
+<a className="truncate" href="#" target="_blank">
+<strong>{:environmentwarning}</strong>
+</a>
+</div>
+<div className="col s3">
+<ul className="right">
+<li></li>
+</ul>
+<a className="right error-badge" id="commitid">NOT CONNECTED
+            </a>
+<div className="right" id="div_pinglight">
+</div>
+</div>
+</div>
+</div>
+</nav>
+<nav>
+<div className="nav-wrapper">
+<div className="row" id="nav-mobile">
+<div className="col s3 m6 l6">
+<ul className="left">
+<li><a className="sidenav-trigger show-on-large" data-target="slide-out" href="#"><i className="material-icons">menu</i></a></li>
+</ul>
+</div>
+<div className="hide-on-large-only col s6 m6 l6" style="padding:0 10px">
+<div className="row">
+<div className="col s1">
+<ul className="left">
+<li><a style="padding:inherit"><i className="material-icons hide icon_saveuserprefs">save</i></a></li>
+<div id="div_saveuserprefs_progress"></div>
+</ul>
+</div>
+<div className="col s1">
+<ul className="left">
+<li><a style="padding:inherit"><i className="material-icons hide" id="icon_socketactive">announcement</i></a></li>
+<div id="icon_socketactive"></div>
+</ul>
+</div>
+<div className="col s10">
+<ul className="right">
+<li><a style="padding:inherit"><i className="material-icons hide icon_saveuserprefs">save</i></a></li>
+<!-- <li><a id="button_loginuser" class="waves-effect waves-light btn xoxnxauth_hide"><i class="material-icons left">cloud</i>Login</a></li> -->
+<li><a className="waves-effect waves-light btn onauth_show" id="btn_Notify"><i className="material-icons">chat_bubble</i></a></li>
+<li><a className="onauth_show sputniknav" data-href="nestcam.html" style="padding:inherit"><i className="material-icons">camera_outdoor</i></a></li>
+<li><a className="onauth_show sputniknav" data-href="mediaview.html" style="padding:inherit"><i className="material-icons">dns</i></a></li>
+<li><a className="onauth_show sputniknav" data-href="home.html" style="padding:inherit"><i className="material-icons">home</i></a></li>
+<li><a className="" id="btn_userauthentication" style="padding:inherit"><i className="material-icons">login</i></a></li>
+</ul>
+</div>
+</div>
+</div>
+<div className="hide-on-med-and-down col s6 m6 l6">
+<ul className="right">
+<li><a className="onauth_show" style="padding:inherit"><i className="material-icons hide icon_saveuserprefs">save</i></a></li>
+<!-- <li><a id="button_loginuser" class="waves-effect waves-light btn onauth_hide"><i class="material-icons left">cloud</i>Login</a></li> -->
+<li><a className="onauth_show" id="btn_Notify">Notify Me!</a></li>
+<li><a className="onauth_show sputniknav" data-href="nestcam.html">Live Cameras</a></li>
+<li><a className="onauth_show sputniknav" data-href="mediaview.html">Media Viewer</a></li>
+<li><a className="onauth_show sputniknav" data-href="home.html"><i className="material-icons">home</i></a></li>
+<li><a className="waves-effect waves-light btn" id="btn_userauthentication"><i className="material-icons">login</i></a></li>
+</ul>
+</div>
+</div>
+</div>
+</nav>
+</div>
+<ul className="sidenav" id="slide-out">
+<li className="logo">
+<!-- <img src="/pages/index/_img/sputnik_pagelogo.png"> -->
+<img alt="mainlogo" className="responsive-img center" src="/pages/index/_img/sputnik-large.svg" style="max-height: 5rem; text-align: center;"/>
+<!-- <object id="front-page-logo" type="image/svg+xml" data="/pages/index/_img/sputnik_pagelogo.png">Your browser does not support png</object></a></li> -->
+<li className="onauth_show no-padding">
+<ul className="collapsible collapsible-accordion" id="collapsible_currentuser">
+<li className="bold"><a className="collapsible-header waves-effect waves-teal">Rohan<img alt="" className="circle responsive-img right" src="/pages/index/_img/sputnik-large.svg" style="max-height: 3rem"/></a>
+<div className="collapsible-body">
+<ul>
+<li><a className="sputniknav" data-href="admin_user.html">Settings</a></li>
+</ul>
+</div>
+</li>
+</ul>
+</li>
+<li>
+<div className="divider"></div>
+</li>
+<li className="onauth_show no-padding">
+<ul className="collapsible collapsible-accordion" id="collapsible_Admin">
+<li className="bold"><a className="collapsible-header waves-effect waves-teal">Admin</a>
+<div className="collapsible-body" style="display: block;">
+<ul>
+<li><a className="sputniknav" data-href="admin_system.html">System</a></li>
+</ul>
+<ul>
+<li><a className="sputniknav" data-href="admin_sputnik.html">Sputnik</a></li>
+</ul>
+<ul>
+<li><a className="sputniknav" data-href="admin_kodiak.html">Kodiak</a></li>
+</ul>
+<ul>
+<li><a className="sputniknav" data-href="admin_bugatti.html">Bugatti</a></li>
+</ul>
+</div>
+</li>
+</ul>
+</li>
+<!--/customsidesettings.html-->
+</li></ul>
+<!-- Modal Structure -->
+<div className="modal" id="sputnikmodal_master">
+<!-- <div class="row compact">
+        <div class="col s12"> -->
+<!-- <div class="row compact">
+            <div class="cols12"> -->
+<nav className="nav">
+<div id="sputnikmodal_header">
+</div>
+</nav>
+<div className="modal-content" id="sputnikmodal_body">
+</div>
+<div className="modal-footer" id="sputnikmodal_footer">
+</div>
+<!-- </div>
+      </div> -->
+</div>
+<!-- Modal Structure -->
+<div className="modal" id="modal_JSONViewer">
+<div className="modal-content">
+<h4>Modal Header</h4>
+<div id="modal_JSONViewer_content">
+</div>
+</div>
+<div className="modal-footer">
+<a className="modal-close waves-effect waves-green btn-flat" href="#!">Close</a>
+</div>
+</div>
+<!--/customnavigation.html-->
+<!--/custommain.html-->
+</main>
+<!--/custombody.html-->
+Additional text after

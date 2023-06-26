@@ -30,7 +30,7 @@
     "parameters": []
   },
   {
-    "name": "fnLogError",
+    "name": "console.log",
     "docstring": "",
     "parameters": []
   },
