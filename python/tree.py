@@ -72,8 +72,8 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--depth", help="Depth of the tree", type=int, default=-1)
     parser.add_argument("-f", "--files", help="Include files", action="store_true")
     parser.add_argument("-r", "--regex", help="Regex pattern to match file/folder names", default=".*")
-    parser.add_argument("-e", "--exclude", help="Names of files/folders to exclude", nargs='+', default=[])
-    parser.add_argument("-i", "--include", help="Regex patterns for paths to include", nargs='+', default=[])
+    parser.add_argument("-e", "--exclude", help="Names of files/folders to exclude (space delimited strings)", nargs='+', default=[])
+    parser.add_argument("-i", "--include", help="Regex patterns for paths to include (space delimited strings)", nargs='+', default=[])
     parser.add_argument("-o", "--output", help="Output format", choices=['text', 'json', 'chat'], default='text')
     args = parser.parse_args()
 

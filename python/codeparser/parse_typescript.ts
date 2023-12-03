@@ -60,7 +60,7 @@ const generateAst = (node: ts.Node, sourceFile: ts.SourceFile) => {
 const parseFile = (filePath: string) => {
   fs.readFile(filePath, "utf-8", (err, data) => {
     if (err) {
-      console.error("Error reading file:", err);
+      fnConsoleError("Error reading file:", err);
       return;
     }
 
@@ -79,5 +79,5 @@ const filePath = process.argv[2];
 if (filePath) {
   parseFile(filePath);
 } else {
-  console.error("Please provide a file path.");
+  fnConsoleError("Please provide a file path.");
 }
