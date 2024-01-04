@@ -31,8 +31,9 @@ echo Make the service start and stop bash scripts
 echo -en '#!/bin/bash\n'\
     ''${STARTCOMMAND}' > /var/log/'${SERVICE_NAME}'_service.log 2>&1' > "/usr/services/${SERVICE_NAME}/start.sh"
 echo -en '#!/bin/bash\n'\
-    'pkill -f "'${SERVICE_NAME}'\/start.sh";\n'\
-    'pkill -f "'${STOPCOMMAND}'"; echo service stopped  > /var/log/'${SERVICE_NAME}'_service.log 2>&1' > "/usr/services/${SERVICE_NAME}/stop.sh" 
+    'pkill -f "'${SERVICE_NAME}'.*start.sh";\n'\
+    'pkill -f "'${STOPCOMMAND}'";\n'\
+    'echo service stopped  > /var/log/'${SERVICE_NAME}'_service.log 2>&1' > "/usr/services/${SERVICE_NAME}/stop.sh" 
 chmod a+x "/usr/services/${SERVICE_NAME}/start.sh"
 chmod a+x "/usr/services/${SERVICE_NAME}/stop.sh"
 echo Make the service daemon definition
@@ -191,9 +192,9 @@ echo -en '<table>\n'\
 echo 'created wiki file: /tmp/'${SERVICE_NAME}'_wiki.html'
 
 read -p 'Would you like to start the services (Y/N)?: ' sInput
-if [ "$sInput" == "Y" ]; 
-then
-    echo start the service
+sInput=${sInput^^}  # Convert input to uppercase for case-insensitive comparison
+if [ "$sInput" = "Y" ]; then
+    echo "Starting the service..."
     systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
     if [ "$WATCHFOLDERS" != "" ]; 
     then 
