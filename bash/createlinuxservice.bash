@@ -1,7 +1,25 @@
 #!/bin/bash
+CONFIG_WAS_LOADED=false
+PROMPTED=false
+
 i=1;
 for param in "$@" 
 do
+    if [[ "$param" == --config=* ]]; then
+        CONFIG_FILE="${param#--config=}"
+        if [ -f "$CONFIG_FILE" ]; then
+            echo "🔄 Loading previous values from $CONFIG_FILE..."
+            if ! grep -q '^SERVICE_NAME=' "$CONFIG_FILE"; then
+                echo "⚠️ Invalid config file structure. Aborting."
+                exit 1
+            fi
+            source "$CONFIG_FILE"
+            CONFIG_WAS_LOADED=true
+        else
+            echo "⚠️ Config file not found: $CONFIG_FILE"
+            exit 1
+        fi
+    fi
     case $param in
         --name) paramname=$param;;
         --start) paramname=$param;;
@@ -9,12 +27,11 @@ do
         --watch) paramname=$param;;
         --restart) paramname=$param;;
         *)
-            if [ -n $paramname ]
+            if [ -n "$paramname" ]
             then
                 case $paramname in
                     --name) SERVICE_NAME=$param;;
                     --start) STARTCOMMAND=$param;;
-                    --stop) STOPCOMMAND=$param;;
                     --watch) WATCHFOLDERS=$param;;
                     --restart) RESTARTTIME=$param;;
                 esac
@@ -24,57 +41,257 @@ do
     esac
     i=$((i + 1));
 done
+# Fallback to interactive input if missing
+if [ -z "$SERVICE_NAME" ]; then
+    read -rp "Enter service name (--name): " SERVICE_NAME
+    PROMPTED=true
+fi
+if [ -z "$STARTCOMMAND" ]; then
+    read -rp "Enter start command (--start): " STARTCOMMAND
+    PROMPTED=true
+fi
+if [ -z "$WATCHFOLDERS" ]; then
+    read -rp "Enter watch folders (--watch), separate with semicolons: " WATCHFOLDERS
+    PROMPTED=true
+fi
+if [ -z "$RESTARTTIME" ]; then
+    read -rp "Enter restart interval (--restart), e.g., 3s: " RESTARTTIME
+    RESTARTTIME=${RESTARTTIME:-3s}
+    PROMPTED=true
+fi
+if [ -z "$LOG_RETAIN_COUNT" ]; then
+    read -rp "Enter how many rotated log files to retain (e.g., 3): " LOG_RETAIN_COUNT
+    LOG_RETAIN_COUNT=${LOG_RETAIN_COUNT:-3}  # Default to 3 if blank
+    PROMPTED=true
+fi
+if [ -z "$MAX_RUNTIME" ]; then
+    read -rp "Enter maximum allowed runtime in seconds (0 for no limit): " MAX_RUNTIME
+    MAX_RUNTIME=${MAX_RUNTIME:-0}
+    PROMPTED=true
+fi
+if [ "$PROMPTED" = true ]; then
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    TMP_CONFIG_FILE="/tmp/${SERVICE_NAME}_service_${TIMESTAMP}.config"
+    echo "💾 Saving service config to $TMP_CONFIG_FILE"
+escape_quotes() {
+    echo "$1" | sed 's/"/\\"/g'
+}
 
-mkdir /usr/services
+cat > "$TMP_CONFIG_FILE" <<EOF
+SERVICE_NAME="$SERVICE_NAME"
+STARTCOMMAND="$(escape_quotes "$STARTCOMMAND")"
+WATCHFOLDERS="$(escape_quotes "$WATCHFOLDERS")"
+RESTARTTIME="$RESTARTTIME"
+LOG_RETAIN_COUNT="$LOG_RETAIN_COUNT"
+MAX_RUNTIME="$MAX_RUNTIME"
+EOF
+
+
+
+    ln -sf "$TMP_CONFIG_FILE" "/tmp/${SERVICE_NAME}_service_latest.config"
+fi
+
+# Ensure process_launcher.sh exists
+PROCESS_LAUNCHER_PATH="/usr/services/process_launcher.sh"
+
+if [ ! -f "$PROCESS_LAUNCHER_PATH" ]; then
+echo "⚙️ Creating missing $PROCESS_LAUNCHER_PATH..."
+mkdir -p /usr/services
+cat > "$PROCESS_LAUNCHER_PATH" <<EOF
+#!/bin/bash
+
+PROCESS_NAME="\$1"
+SCRIPT_PATH="\$2"
+MAX_RUNTIME="\$3"
+LOG_FILE="\$4"
+
+if [[ -z "\$PROCESS_NAME" || -z "\$SCRIPT_PATH" || -z "\$MAX_RUNTIME" ]]; then
+    echo "Usage: \$0 <PROCESS_NAME> <SCRIPT_PATH> <MAX_RUNTIME> [LOG_FILE]"
+    exit 0
+fi
+
+if [[ -n "\$LOG_FILE" && ! -w "\$LOG_FILE" ]]; then
+    touch "\$LOG_FILE" && chmod 664 "\$LOG_FILE"
+fi
+
+log() {
+    if [[ -n "\$LOG_FILE" && -w "\$LOG_FILE" ]]; then
+        echo "\$(date '+%Y-%m-%d %H:%M:%S') - \$1" >> "\$LOG_FILE"
+    else
+        echo "\$(date '+%Y-%m-%d %H:%M:%S') - \$1"
+    fi
+}
+
+log "Checking for running instances of \$PROCESS_NAME..."
+
+PIDS=\$(pgrep -fa "/bin/bash \$SCRIPT_PATH" | awk '{print \$1}' | grep -v \$\$ | grep -v \$PPID)
+VALID_PROCESS_FOUND=false
+
+kill_process_tree() {
+    local PARENT_PID=\$1
+    CHILD_PIDS=\$(pgrep -P "\$PARENT_PID")
+    if [[ -n "\$CHILD_PIDS" ]]; then
+        for CHILD in \$CHILD_PIDS; do
+            kill_process_tree "\$CHILD"
+        done
+    fi
+
+    log "Killing process \$PARENT_PID and its children..."
+    kill "\$PARENT_PID"
+    sleep 2
+
+    if ps -p "\$PARENT_PID" > /dev/null 2>&1; then
+        log "Process \$PARENT_PID did not exit, forcing SIGKILL..."
+        kill -9 "\$PARENT_PID"
+    fi
+}
+
+if [[ -n "\$PIDS" ]]; then
+    for PID in \$PIDS; do
+        if ! ps -p "\$PID" > /dev/null 2>&1; then
+            log "Detected process \$PID is no longer running. Ignoring."
+            continue
+        fi
+
+        ELAPSED_TIME=\$(ps -o etimes= -p "\$PID" | awk '{print \$1}')
+
+        if [[ -n "\$ELAPSED_TIME" ]]; then
+            if [[ "\$ELAPSED_TIME" -gt "\$MAX_RUNTIME" ]]; then
+                log "Process \$PID has been running for more than \$MAX_RUNTIME seconds. Killing it and its children..."
+                kill_process_tree "\$PID"
+            else
+                log "Process \$PID is running within allowed time of \$MAX_RUNTIME seconds. Exiting with 'found_valid_process'."
+                VALID_PROCESS_FOUND=true
+            fi
+        fi
+    done
+fi
+
+if [[ "\$VALID_PROCESS_FOUND" == true ]]; then
+    exit 1
+else
+    exit 0
+fi
+EOF
+
+
+    chmod +x "$PROCESS_LAUNCHER_PATH"
+fi
+
+
+
 mkdir "/usr/services/${SERVICE_NAME}"
 echo Make the service start and stop bash scripts
-echo -en '#!/bin/bash\n'\
-    ''${STARTCOMMAND}' > /var/log/'${SERVICE_NAME}'_service.log 2>&1' > "/usr/services/${SERVICE_NAME}/start.sh"
-echo -en '#!/bin/bash\n'\
-    'pkill -f "'${SERVICE_NAME}'.*start.sh";\n'\
-    'pkill -f "'${STOPCOMMAND}'";\n'\
-    'echo service stopped  > /var/log/'${SERVICE_NAME}'_service.log 2>&1' > "/usr/services/${SERVICE_NAME}/stop.sh" 
+
+cat > "/usr/services/${SERVICE_NAME}/start.sh" <<EOF
+#!/bin/bash
+set -e
+
+PROCESS_NAME="${SERVICE_NAME}"
+SCRIPT_PATH="/usr/services/\${PROCESS_NAME}/start.sh"
+LOG_FILE="/var/log/\${PROCESS_NAME}_service.log"
+PROCESS_LAUNCHER="/usr/services/process_launcher.sh"
+MAX_RUNTIME=${MAX_RUNTIME}
+
+# Rotate logs
+for ((i=${LOG_RETAIN_COUNT}; i>0; i--)); do
+    if [ -f "\${LOG_FILE}.\$((i-1))" ]; then
+        mv "\${LOG_FILE}.\$((i-1))" "\${LOG_FILE}.\$i"
+    fi
+done
+[ -f "\${LOG_FILE}" ] && mv "\${LOG_FILE}" "\${LOG_FILE}.1"
+
+# Use process manager unless MAX_RUNTIME is 0
+if [[ "\$MAX_RUNTIME" -gt 0 ]]; then
+    "\$PROCESS_LAUNCHER" "\$PROCESS_NAME" "\$SCRIPT_PATH" "\$MAX_RUNTIME" "\$LOG_FILE"
+    [[ \$? -eq 1 ]] && exit 0
+fi
+
+echo "\$(date '+%Y-%m-%d %H:%M:%S') - Starting \$PROCESS_NAME..." > "\$LOG_FILE"
+if ! ${STARTCOMMAND} 2>&1 | tee -a "\$LOG_FILE"; then
+    echo "\$(date '+%Y-%m-%d %H:%M:%S') - Error: Execution failed." >> "\$LOG_FILE"
+    exit 1
+fi
+echo "\$(date '+%Y-%m-%d %H:%M:%S') - \$PROCESS_NAME completed." >> "\$LOG_FILE"
+exit 0
+EOF
+
+
+echo "Make the service stop bash script"
+cat > "/usr/services/${SERVICE_NAME}/stop.sh" <<EOF
+#!/bin/bash
+set -e
+
+PROCESS_NAME="${SERVICE_NAME}"
+SCRIPT_PATH="/usr/services/\${PROCESS_NAME}/start.sh"
+LOG_FILE="/var/log/\${PROCESS_NAME}_service.log"
+PROCESS_LAUNCHER="/usr/services/process_launcher.sh"
+
+# Force cleanup: treat all existing processes as over time limit
+"\$PROCESS_LAUNCHER" "\$PROCESS_NAME" "\$SCRIPT_PATH" 1 "\$LOG_FILE" || true
+
+echo "\$(date '+%Y-%m-%d %H:%M:%S') - Service stopped." >> "\$LOG_FILE"
+EOF
+
+
 chmod a+x "/usr/services/${SERVICE_NAME}/start.sh"
 chmod a+x "/usr/services/${SERVICE_NAME}/stop.sh"
 echo Make the service daemon definition
-echo -en '[Unit]\n'\
-    'Description='${SERVICE_NAME}' service\n'\
-    'After=network.target\n'\
-    '\n'\
-    '[Service]\n'\
-    'Type=simple\n'\
-    'ExecStart=/bin/bash /usr/services/'${SERVICE_NAME}'/start.sh\n'\
-    'ExecStop=/bin/bash /usr/services/'${SERVICE_NAME}'/stop.sh\n'\
-    'Restart=always\n'\
-    'RestartSec='${RESTARTTIME}'\n'\
-    'TimeoutSec=60\n'\
-    'RuntimeMaxSec=infinity\n'\
-    'PIDFile=/tmp/'${SERVICE_NAME}'.pid\n'\
-    '\n'\
-    '[Install]\n'\
-    'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}.service"
+cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
+[Unit]
+Description=${SERVICE_NAME} service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/services/${SERVICE_NAME}/start.sh
+ExecStop=/usr/services/${SERVICE_NAME}/stop.sh
+Restart=always
+RestartSec=${RESTARTTIME}
+TimeoutSec=60
+RuntimeMaxSec=infinity
+PIDFile=/tmp/${SERVICE_NAME}.pid
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 echo Make the srv-watcher.service daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
-    echo -en '[Unit]\n'\
-    'Description='${SERVICE_NAME}' restarter\n'\
-    'After=network.target\n'\
-    '\n'\
-    '[Service]\n'\
-    'Type=oneshot\n'\
-    'ExecStart=systemctl restart '${SERVICE_NAME}'.service\n'\
-    '\n'\
-    '[Install]\n'\
-    'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
+cat > "/etc/systemd/system/${SERVICE_NAME}-watcher.service" <<EOF
+[Unit]
+Description=${SERVICE_NAME} restarter
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=systemctl restart ${SERVICE_NAME}.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 fi
 echo Make the srv-watcher.path daemon definition
+CLEANED_WATCHFOLDERS=$(echo "$WATCHFOLDERS" | tr ';' '\n' | sed '/^\s*$/d')
+
+# If the cleaned list is empty, reset WATCHFOLDERS
+if [ -z "$CLEANED_WATCHFOLDERS" ]; then
+    WATCHFOLDERS=""
+fi
 if [ "$WATCHFOLDERS" != "" ]; 
 then 
-    echo -en '[Path]
-    '${WATCHFOLDERS//;/"\nPathModified="}'\n'\
-    '\n'\
-    '[Install]\n'\
-    'WantedBy=multi-user.target' > "/etc/systemd/system/${SERVICE_NAME}-watcher.path"; 
+WATCH_ENTRIES=$(echo "$WATCHFOLDERS" | tr ';' '\n' | sed '/^$/d' | sed 's/^/PathModified=/')
+
+cat > "/etc/systemd/system/${SERVICE_NAME}-watcher.path" <<EOF
+[Path]
+${WATCH_ENTRIES}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 fi;
 echo enable the service daemon "/etc/systemd/system/${SERVICE_NAME}.service"
 systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
@@ -87,16 +304,35 @@ then
 fi
 echo reload the deamon
 systemctl daemon-reload
-touch "/var/log/${SERVICE_NAME}_service.log"
-chmod 776 "/var/log/${SERVICE_NAME}_service.log"
 
-echo sudo rm "/usr/services/${SERVICE_NAME}/start.sh"
-echo sudo rm "/usr/services/${SERVICE_NAME}/stop.sh"
-echo sudo rm "/etc/systemd/system/${SERVICE_NAME}.service"
-echo sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.service"
-echo sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.path"
-echo sudo rm "/var/log/${SERVICE_NAME}_service.log"
-echo sudo systemctl daemon-reload
+# Determine current user
+OWNER_USER=${SUDO_USER:-$(whoami)}
+OWNER_GROUP=$(id -gn "$OWNER_USER")
+
+
+# Create or touch the log file
+LOG_FILE="/var/log/${SERVICE_NAME}_service.log"
+touch "$LOG_FILE"
+chown "$OWNER_USER:$OWNER_GROUP" "$LOG_FILE"
+chmod 664 "$LOG_FILE"
+
+
+CLEANUP_SCRIPT="/tmp/cleanup_${SERVICE_NAME}.sh"
+cat > "$CLEANUP_SCRIPT" <<EOF
+#!/bin/bash
+sudo rm "/usr/services/${SERVICE_NAME}/start.sh"
+sudo rm "/usr/services/${SERVICE_NAME}/stop.sh"
+sudo rm -rf "/usr/services/${SERVICE_NAME}/"
+sudo rm "/etc/systemd/system/${SERVICE_NAME}.service"
+sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.service"
+sudo rm "/etc/systemd/system/${SERVICE_NAME}-watcher.path"
+sudo rm "/var/log/${SERVICE_NAME}_service.log"
+sudo systemctl daemon-reload
+EOF
+
+chmod +x "$CLEANUP_SCRIPT"
+echo "🧹 Cleanup script written to $CLEANUP_SCRIPT"
+
 
 echo -en '<table>\n'\
 '<tr>\n'\
@@ -190,6 +426,13 @@ echo -en '<table>\n'\
 '</table>' > /tmp/${SERVICE_NAME}_wiki.html
 
 echo 'created wiki file: /tmp/'${SERVICE_NAME}'_wiki.html'
+
+echo "Validating systemd units..."
+if [ "$WATCHFOLDERS" != "" ]; then
+    systemd-analyze verify /etc/systemd/system/${SERVICE_NAME}*.service /etc/systemd/system/${SERVICE_NAME}*.path || true
+else
+    systemd-analyze verify /etc/systemd/system/${SERVICE_NAME}*.service || true
+fi
 
 read -p 'Would you like to start the services (Y/N)?: ' sInput
 sInput=${sInput^^}  # Convert input to uppercase for case-insensitive comparison
