@@ -69,6 +69,28 @@ if [ -z "$MAX_RUNTIME" ]; then
     MAX_RUNTIME=${MAX_RUNTIME:-0}
     PROMPTED=true
 fi
+if [ -z "$SERVICE_MODE" ]; then
+    echo "Choose how the service should run:"
+    echo "  [1] Always running (auto-restarts on failure)"
+    echo "  [2] Scheduled every X seconds (e.g., every 600s)"
+    echo "  [3] Run once per day at specific time (e.g., 03:15)"
+    read -rp "Enter choice [1/2/3]: " SERVICE_MODE_CHOICE
+    case "$SERVICE_MODE_CHOICE" in
+        2)
+            SERVICE_MODE="interval"
+            read -rp "Enter interval in seconds (e.g., 900 for 15min): " RESTARTTIME_SECONDS
+            ;;
+        3)
+            SERVICE_MODE="daily"
+            read -rp "Enter time of day to run (HH:MM, 24h format): " RUN_DAILY_TIME
+            ;;
+        *)
+            SERVICE_MODE="always"
+            ;;
+    esac
+    PROMPTED=true
+fi
+
 if [ "$PROMPTED" = true ]; then
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     TMP_CONFIG_FILE="/tmp/${SERVICE_NAME}_service_${TIMESTAMP}.config"
@@ -84,6 +106,10 @@ WATCHFOLDERS="$(escape_quotes "$WATCHFOLDERS")"
 RESTARTTIME="$RESTARTTIME"
 LOG_RETAIN_COUNT="$LOG_RETAIN_COUNT"
 MAX_RUNTIME="$MAX_RUNTIME"
+SERVICE_MODE="$SERVICE_MODE"
+RESTARTTIME_SECONDS="${RESTARTTIME_SECONDS:-}"
+RUN_DAILY_TIME="${RUN_DAILY_TIME:-}"
+
 EOF
 
 
@@ -237,9 +263,72 @@ EOF
 chmod a+x "/usr/services/${SERVICE_NAME}/start.sh"
 chmod a+x "/usr/services/${SERVICE_NAME}/stop.sh"
 echo Make the service daemon definition
-cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
+if [ "$SERVICE_MODE" == "interval" ]; then
+    # Interval-based timer
+    cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
-Description=${SERVICE_NAME} service
+Description=${SERVICE_NAME} interval-based service
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/services/${SERVICE_NAME}/start.sh
+ExecStop=/usr/services/${SERVICE_NAME}/stop.sh
+TimeoutSec=300
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > "/etc/systemd/system/${SERVICE_NAME}.timer" <<EOF
+[Unit]
+Description=Interval timer for ${SERVICE_NAME}
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=${RESTARTTIME_SECONDS}
+AccuracySec=1s
+Unit=${SERVICE_NAME}.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+elif [ "$SERVICE_MODE" == "daily" ]; then
+    # Daily timer
+    cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
+[Unit]
+Description=${SERVICE_NAME} daily service
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/services/${SERVICE_NAME}/start.sh
+ExecStop=/usr/services/${SERVICE_NAME}/stop.sh
+TimeoutSec=300
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > "/etc/systemd/system/${SERVICE_NAME}.timer" <<EOF
+[Unit]
+Description=Daily timer for ${SERVICE_NAME}
+
+[Timer]
+OnCalendar=*-*-* ${RUN_DAILY_TIME}
+AccuracySec=1s
+Unit=${SERVICE_NAME}.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+else
+    # Always-on service
+    cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
+[Unit]
+Description=${SERVICE_NAME} always-on service
 After=network.target
 
 [Service]
@@ -255,6 +344,8 @@ PIDFile=/tmp/${SERVICE_NAME}.pid
 [Install]
 WantedBy=multi-user.target
 EOF
+fi
+
 
 echo Make the srv-watcher.service daemon definition
 if [ "$WATCHFOLDERS" != "" ]; 
@@ -438,10 +529,13 @@ read -p 'Would you like to start the services (Y/N)?: ' sInput
 sInput=${sInput^^}  # Convert input to uppercase for case-insensitive comparison
 if [ "$sInput" = "Y" ]; then
     echo "Starting the service..."
-    systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
-    if [ "$WATCHFOLDERS" != "" ]; 
-    then 
-        echo start the path watch service
-        systemctl start "${SERVICE_NAME}-watcher.service";
-    fi;
+    systemctl enable "${SERVICE_NAME}.service"
+
+    if [ "$SERVICE_MODE" == "interval" ] || [ "$SERVICE_MODE" == "daily" ]; then
+        systemctl enable "${SERVICE_NAME}.timer"
+        systemctl start "${SERVICE_NAME}.timer"
+    elif [ "$WATCHFOLDERS" != "" ]; then
+        echo "Starting the path watch service"
+        systemctl start "${SERVICE_NAME}-watcher.service"
+    fi
 fi
