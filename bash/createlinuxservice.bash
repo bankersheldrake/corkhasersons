@@ -23,17 +23,19 @@ do
     case $param in
         --name) paramname=$param;;
         --start) paramname=$param;;
-        --stop) paramname=$param;;
         --watch) paramname=$param;;
         --restart) paramname=$param;;
-        *)
-            if [ -n "$paramname" ]
-            then
+        --user) paramname=$param;; 
+        --cwd) paramname=$param;; 
+        * )
+            if [ -n "$paramname" ]; then
                 case $paramname in
                     --name) SERVICE_NAME=$param;;
                     --start) STARTCOMMAND=$param;;
                     --watch) WATCHFOLDERS=$param;;
                     --restart) RESTARTTIME=$param;;
+                    --user) RUN_AS_USER=$param; RUN_AS_GROUP=$(id -gn "$RUN_AS_USER");;
+                    --cwd) WORKING_DIR=$param;;
                 esac
             fi
             paramname=''
@@ -50,25 +52,7 @@ if [ -z "$STARTCOMMAND" ]; then
     read -rp "Enter start command (--start): " STARTCOMMAND
     PROMPTED=true
 fi
-if [ -z "$WATCHFOLDERS" ]; then
-    read -rp "Enter watch folders (--watch), separate with semicolons: " WATCHFOLDERS
-    PROMPTED=true
-fi
-if [ -z "$RESTARTTIME" ]; then
-    read -rp "Enter restart interval (--restart), e.g., 3s: " RESTARTTIME
-    RESTARTTIME=${RESTARTTIME:-3s}
-    PROMPTED=true
-fi
-if [ -z "$LOG_RETAIN_COUNT" ]; then
-    read -rp "Enter how many rotated log files to retain (e.g., 3): " LOG_RETAIN_COUNT
-    LOG_RETAIN_COUNT=${LOG_RETAIN_COUNT:-3}  # Default to 3 if blank
-    PROMPTED=true
-fi
-if [ -z "$MAX_RUNTIME" ]; then
-    read -rp "Enter maximum allowed runtime in seconds (0 for no limit): " MAX_RUNTIME
-    MAX_RUNTIME=${MAX_RUNTIME:-0}
-    PROMPTED=true
-fi
+
 if [ -z "$SERVICE_MODE" ]; then
     echo "Choose how the service should run:"
     echo "  [1] Always running (auto-restarts on failure)"
@@ -91,6 +75,151 @@ if [ -z "$SERVICE_MODE" ]; then
     PROMPTED=true
 fi
 
+# Add user prompt logic with group filtering
+if [ -z "$RUN_AS_USER" ]; then
+    # To add users that are listed in this choice:
+    # sudo groupadd -f serviceusers && \
+    # sudo usermod -aG serviceusers tailscaleuser && \
+    # sudo usermod -aG serviceusers forgeLANAccess && \
+    # echo "✅ Users added to 'serviceusers' group."
+    # ✅ Users added to 'serviceusers' group.
+    DEFAULT_USER=${SUDO_USER:-$(whoami)}
+
+    # Include: root, all users in serviceusers group, and any UID >= 1000 with login shell
+    SERVICE_GROUP_USERS=$(getent group serviceusers | awk -F: '{print $4}' | tr ',' '\n')
+
+    # Also include 'root' and other valid login users (UID >= 1000 with real shell)
+    SYSTEM_USERS=$(awk -F: '($3 == 0 || $3 >= 1000) && ($7 !~ /(false|nologin)$/) {print $1}' /etc/passwd)
+
+    # Combine and deduplicate
+    AVAILABLE_USERS=$(echo -e "${SERVICE_GROUP_USERS}\n${SYSTEM_USERS}\nroot" | sort -u)
+
+    echo "Choose which user account the service should run under:"
+    select SELECTED_USER in $AVAILABLE_USERS; do
+        if [ -n "$SELECTED_USER" ]; then
+            break
+        else
+            echo "⚠️ Invalid choice. Please choose a valid number."
+        fi
+    done
+
+    RUN_AS_USER="$SELECTED_USER"
+    RUN_AS_GROUP=$(id -gn "$RUN_AS_USER")
+    PROMPTED=true
+fi
+
+
+if [ -z "$WORKING_DIR" ]; then
+    DEFAULT_DIR="/home/${RUN_AS_USER}"
+    read -rp "Enter working directory for the service (default: $DEFAULT_DIR): " WORKING_DIR
+    WORKING_DIR="${WORKING_DIR:-$DEFAULT_DIR}"
+
+    # Validate it exists
+    while [ ! -d "$WORKING_DIR" ]; do
+        echo "❌ Directory does not exist: $WORKING_DIR"
+        read -rp "Please enter a valid working directory: " WORKING_DIR
+    done
+
+    PROMPTED=true
+fi
+
+if [ "$SERVICE_MODE" == "always" ] && [ -z "$RESTARTTIME" ]; then
+    read -rp "Enter restart delay after failure (--restart), e.g., 3s: " RESTARTTIME
+    RESTARTTIME=${RESTARTTIME:-3s}
+    PROMPTED=true
+fi
+
+if [ -z "$WATCHFOLDERS" ]; then
+    WATCHFOLDERS=""
+    while true; do
+        read -rp "Enter folder(s) or file(s) to watch (--watch), separated by semicolons if more than one: " INPUT_PATHS
+        INPUT_PATHS=$(echo "$INPUT_PATHS" | xargs)  # Trim
+
+        if [[ "$INPUT_PATHS" == *";"* ]]; then
+            # Multiple entries — don't prompt for subfolders
+            IFS=';' read -ra PATH_ARRAY <<< "$INPUT_PATHS"
+            for path in "${PATH_ARRAY[@]}"; do
+                if [ -e "$path" ]; then
+                    WATCHFOLDERS+="${path};"
+                else
+                    echo "⚠️ Path not found: $path"
+                fi
+            done
+        else
+            # Single entry
+            if [ -f "$INPUT_PATHS" ]; then
+                # File: just add it
+                WATCHFOLDERS+="${INPUT_PATHS};"
+            elif [ -d "$INPUT_PATHS" ]; then
+                read -rp "Include all subfolders of $INPUT_PATHS? [y/N]: " INCLUDE_SUBFOLDERS
+                INCLUDE_SUBFOLDERS=${INCLUDE_SUBFOLDERS^^}  # Uppercase
+
+                if [ "$INCLUDE_SUBFOLDERS" = "Y" ]; then
+                    SUBFOLDERS=$(find "$INPUT_PATHS" -type d)
+                    for folder in $SUBFOLDERS; do
+                        WATCHFOLDERS+="${folder};"
+                    done
+                else
+                    WATCHFOLDERS+="${INPUT_PATHS};"
+                fi
+            else
+                echo "⚠️ Path not found: $INPUT_PATHS"
+            fi
+        fi
+
+        read -rp "Add another path to watch? [y/N]: " ADD_ANOTHER
+        ADD_ANOTHER=${ADD_ANOTHER^^}
+        [[ "$ADD_ANOTHER" != "Y" ]] && break
+    done
+
+    WATCHFOLDERS="${WATCHFOLDERS%;}"  # Strip trailing ;
+    PROMPTED=true
+fi
+
+if [ -z "$LOG_RETAIN_COUNT" ]; then
+    read -rp "Enter how many rotated log files to retain (e.g., 3): " LOG_RETAIN_COUNT
+    LOG_RETAIN_COUNT=${LOG_RETAIN_COUNT:-3}  # Default to 3 if blank
+    PROMPTED=true
+fi
+if [ "$SERVICE_MODE" == "always" ] && [ -z "$MAX_RUNTIME" ]; then
+    read -rp "Enter maximum allowed runtime in seconds (0 for no limit): " MAX_RUNTIME
+    MAX_RUNTIME=${MAX_RUNTIME:-0}
+    PROMPTED=true
+fi
+
+echo ""
+echo "🔍 Please review the collected service configuration:"
+echo "----------------------------------------------------"
+echo "Service Name        : $SERVICE_NAME"
+echo "Start Command       : $STARTCOMMAND"
+echo "Service Mode        : $SERVICE_MODE"
+[ "$SERVICE_MODE" == "interval" ] && echo "Interval (seconds)  : ${RESTARTTIME_SECONDS:-<not set>}"
+[ "$SERVICE_MODE" == "daily" ] && echo "Run Time (daily)    : ${RUN_DAILY_TIME:-<not set>}"
+[ "$SERVICE_MODE" == "always" ] && echo "Restart Delay       : ${RESTARTTIME:-<not set>}"
+[ -n "$MAX_RUNTIME" ] && echo "Max Runtime (sec)   : $MAX_RUNTIME"
+[ -n "$LOG_RETAIN_COUNT" ] && echo "Log Retain Count    : $LOG_RETAIN_COUNT"
+[ -n "$RUN_AS_USER" ] && echo "Run As User         : $RUN_AS_USER"
+[ -n "$RUN_AS_GROUP" ] && echo "Run As Group        : $RUN_AS_GROUP"
+[ -n "$WORKING_DIR" ] && echo "Working Directory   : $WORKING_DIR"
+
+if [ -n "$WATCHFOLDERS" ]; then
+    echo "Watched Folders     :"
+    IFS=';' read -ra PATHS <<< "$WATCHFOLDERS"
+    for path in "${PATHS[@]}"; do
+        echo "  - $path"
+    done
+else
+    echo "Watched Folders     : <none>"
+fi
+echo "----------------------------------------------------"
+
+read -rp "✅ Proceed with service creation? [Y/N]: " CONFIRM
+CONFIRM=${CONFIRM^^}
+if [ "$CONFIRM" != "Y" ]; then
+    echo "❌ Aborting setup by user choice."
+    exit 0
+fi
+
 if [ "$PROMPTED" = true ]; then
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     TMP_CONFIG_FILE="/tmp/${SERVICE_NAME}_service_${TIMESTAMP}.config"
@@ -109,7 +238,9 @@ MAX_RUNTIME="$MAX_RUNTIME"
 SERVICE_MODE="$SERVICE_MODE"
 RESTARTTIME_SECONDS="${RESTARTTIME_SECONDS:-}"
 RUN_DAILY_TIME="${RUN_DAILY_TIME:-}"
-
+RUN_AS_USER="$RUN_AS_USER"
+RUN_AS_GROUP="$RUN_AS_GROUP"
+WORKING_DIR="$WORKING_DIR"
 EOF
 
 
@@ -262,95 +393,110 @@ EOF
 
 chmod a+x "/usr/services/${SERVICE_NAME}/start.sh"
 chmod a+x "/usr/services/${SERVICE_NAME}/stop.sh"
-echo Make the service daemon definition
+echo "Make the service daemon definition"
+
 if [ "$SERVICE_MODE" == "interval" ]; then
-    # Interval-based timer
-    cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
-[Unit]
-Description=${SERVICE_NAME} interval-based service
-After=network.target
+    # Interval-based service
+    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+    {
+        echo "[Unit]"
+        echo "Description=${SERVICE_NAME} interval-based service"
+        echo "After=network.target"
+        echo ""
+        echo "[Service]"
+        echo "Type=oneshot"
+        echo "ExecStart=/usr/services/${SERVICE_NAME}/start.sh"
+        echo "ExecStop=/usr/services/${SERVICE_NAME}/stop.sh"
+        [ -n "$RUN_AS_USER" ] && echo "User=${RUN_AS_USER}"
+        [ -n "$RUN_AS_GROUP" ] && echo "Group=${RUN_AS_GROUP}"
+        [ -n "$WORKING_DIR" ] && echo "WorkingDirectory=${WORKING_DIR}"
+        echo "TimeoutSec=300"
+        echo ""
+        echo "[Install]"
+        echo "WantedBy=multi-user.target"
+    } > "$SERVICE_FILE"
 
-[Service]
-Type=oneshot
-ExecStart=/usr/services/${SERVICE_NAME}/start.sh
-ExecStop=/usr/services/${SERVICE_NAME}/stop.sh
-TimeoutSec=300
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    cat > "/etc/systemd/system/${SERVICE_NAME}.timer" <<EOF
-[Unit]
-Description=Interval timer for ${SERVICE_NAME}
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=${RESTARTTIME_SECONDS}
-AccuracySec=1s
-Unit=${SERVICE_NAME}.service
-
-[Install]
-WantedBy=timers.target
-EOF
+    TIMER_FILE="/etc/systemd/system/${SERVICE_NAME}.timer"
+    {
+        echo "[Unit]"
+        echo "Description=Interval timer for ${SERVICE_NAME}"
+        echo ""
+        echo "[Timer]"
+        echo "OnBootSec=5min"
+        [ -n "$RESTARTTIME_SECONDS" ] && echo "OnUnitActiveSec=${RESTARTTIME_SECONDS}"
+        echo "AccuracySec=1s"
+        echo "Unit=${SERVICE_NAME}.service"
+        echo ""
+        echo "[Install]"
+        echo "WantedBy=timers.target"
+    } > "$TIMER_FILE"
 
 elif [ "$SERVICE_MODE" == "daily" ]; then
-    # Daily timer
-    cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
-[Unit]
-Description=${SERVICE_NAME} daily service
-After=network.target
+    # Daily timer service
+    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+    {
+        echo "[Unit]"
+        echo "Description=${SERVICE_NAME} daily service"
+        echo "After=network.target"
+        echo ""
+        echo "[Service]"
+        echo "Type=oneshot"
+        echo "ExecStart=/usr/services/${SERVICE_NAME}/start.sh"
+        echo "ExecStop=/usr/services/${SERVICE_NAME}/stop.sh"
+        [ -n "$RUN_AS_USER" ] && echo "User=${RUN_AS_USER}"
+        [ -n "$RUN_AS_GROUP" ] && echo "Group=${RUN_AS_GROUP}"
+        [ -n "$WORKING_DIR" ] && echo "WorkingDirectory=${WORKING_DIR}"
+        echo "TimeoutSec=300"
+        echo ""
+        echo "[Install]"
+        echo "WantedBy=multi-user.target"
+    } > "$SERVICE_FILE"
 
-[Service]
-Type=oneshot
-ExecStart=/usr/services/${SERVICE_NAME}/start.sh
-ExecStop=/usr/services/${SERVICE_NAME}/stop.sh
-TimeoutSec=300
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    cat > "/etc/systemd/system/${SERVICE_NAME}.timer" <<EOF
-[Unit]
-Description=Daily timer for ${SERVICE_NAME}
-
-[Timer]
-OnCalendar=*-*-* ${RUN_DAILY_TIME}
-AccuracySec=1s
-Unit=${SERVICE_NAME}.service
-
-[Install]
-WantedBy=timers.target
-EOF
+    TIMER_FILE="/etc/systemd/system/${SERVICE_NAME}.timer"
+    {
+        echo "[Unit]"
+        echo "Description=Daily timer for ${SERVICE_NAME}"
+        echo ""
+        echo "[Timer]"
+        [ -n "$RUN_DAILY_TIME" ] && echo "OnCalendar=*-*-* ${RUN_DAILY_TIME}"
+        echo "AccuracySec=1s"
+        echo "Unit=${SERVICE_NAME}.service"
+        echo ""
+        echo "[Install]"
+        echo "WantedBy=timers.target"
+    } > "$TIMER_FILE"
 
 else
     # Always-on service
-    cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
-[Unit]
-Description=${SERVICE_NAME} always-on service
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/services/${SERVICE_NAME}/start.sh
-ExecStop=/usr/services/${SERVICE_NAME}/stop.sh
-Restart=always
-RestartSec=${RESTARTTIME}
-TimeoutSec=60
-RuntimeMaxSec=infinity
-PIDFile=/tmp/${SERVICE_NAME}.pid
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+    {
+        echo "[Unit]"
+        echo "Description=${SERVICE_NAME} always-on service"
+        echo "After=network.target"
+        echo ""
+        echo "[Service]"
+        echo "Type=simple"
+        echo "ExecStart=/usr/services/${SERVICE_NAME}/start.sh"
+        echo "ExecStop=/usr/services/${SERVICE_NAME}/stop.sh"
+        echo "Restart=always"
+        [ -n "$RESTARTTIME" ] && echo "RestartSec=${RESTARTTIME}"
+        [ -n "$RUN_AS_USER" ] && echo "User=${RUN_AS_USER}"
+        [ -n "$RUN_AS_GROUP" ] && echo "Group=${RUN_AS_GROUP}"
+        [ -n "$WORKING_DIR" ] && echo "WorkingDirectory=${WORKING_DIR}"
+        echo "TimeoutSec=60"
+        echo "RuntimeMaxSec=infinity"
+        echo "PIDFile=/tmp/${SERVICE_NAME}.pid"
+        echo ""
+        echo "[Install]"
+        echo "WantedBy=multi-user.target"
+    } > "$SERVICE_FILE"
 fi
 
-
 echo Make the srv-watcher.service daemon definition
-if [ "$WATCHFOLDERS" != "" ]; 
-then 
-cat > "/etc/systemd/system/${SERVICE_NAME}-watcher.service" <<EOF
+if [ "$WATCHFOLDERS" != "" ]; then
+    echo "Make the srv-watcher.service daemon definition"
+
+    cat > "/etc/systemd/system/${SERVICE_NAME}-watcher.service" <<EOF
 [Unit]
 Description=${SERVICE_NAME} restarter
 After=network.target
@@ -363,27 +509,21 @@ ExecStart=systemctl restart ${SERVICE_NAME}.service
 WantedBy=multi-user.target
 EOF
 
+    echo "Make the srv-watcher.path daemon definition"
+    
+    CLEANED_WATCHFOLDERS=$(echo "$WATCHFOLDERS" | tr ';' '\n' | sed '/^\s*$/d')
+    
+    if [ -n "$CLEANED_WATCHFOLDERS" ]; then
+        {
+            echo "[Path]"
+            echo "$CLEANED_WATCHFOLDERS" | sed 's/^/PathModified=/'
+            echo ""
+            echo "[Install]"
+            echo "WantedBy=multi-user.target"
+        } > "/etc/systemd/system/${SERVICE_NAME}-watcher.path"
+    fi
 fi
-echo Make the srv-watcher.path daemon definition
-CLEANED_WATCHFOLDERS=$(echo "$WATCHFOLDERS" | tr ';' '\n' | sed '/^\s*$/d')
 
-# If the cleaned list is empty, reset WATCHFOLDERS
-if [ -z "$CLEANED_WATCHFOLDERS" ]; then
-    WATCHFOLDERS=""
-fi
-if [ "$WATCHFOLDERS" != "" ]; 
-then 
-WATCH_ENTRIES=$(echo "$WATCHFOLDERS" | tr ';' '\n' | sed '/^$/d' | sed 's/^/PathModified=/')
-
-cat > "/etc/systemd/system/${SERVICE_NAME}-watcher.path" <<EOF
-[Path]
-${WATCH_ENTRIES}
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-fi;
 echo enable the service daemon "/etc/systemd/system/${SERVICE_NAME}.service"
 systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
 # echo enabled the service daemon "/etc/systemd/system/${SERVICE_NAME}.service"
