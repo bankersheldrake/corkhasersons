@@ -3,7 +3,7 @@ CONFIG_WAS_LOADED=false
 PROMPTED=false
 
 i=1;
-for param in "$@" 
+for param in "$@"
 do
     if [[ "$param" == --config=* ]]; then
         CONFIG_FILE="${param#--config=}"
@@ -25,8 +25,8 @@ do
         --start) paramname=$param;;
         --watch) paramname=$param;;
         --restart) paramname=$param;;
-        --user) paramname=$param;; 
-        --cwd) paramname=$param;; 
+        --user) paramname=$param;;
+        --cwd) paramname=$param;;
         * )
             if [ -n "$paramname" ]; then
                 case $paramname in
@@ -75,53 +75,62 @@ if [ -z "$SERVICE_MODE" ]; then
     PROMPTED=true
 fi
 
-# Add user prompt logic with group filtering
+# Add user prompt logic with group filtering (optional)
 if [ -z "$RUN_AS_USER" ]; then
-    # To add users that are listed in this choice:
-    # sudo groupadd -f serviceusers && \
-    # sudo usermod -aG serviceusers tailscaleuser && \
-    # sudo usermod -aG serviceusers forgeLANAccess && \
-    # echo "✅ Users added to 'serviceusers' group."
-    # ✅ Users added to 'serviceusers' group.
-    DEFAULT_USER=${SUDO_USER:-$(whoami)}
-
-    # Include: root, all users in serviceusers group, and any UID >= 1000 with login shell
+    # Build candidate list: root, users in 'serviceusers', and normal login users
     SERVICE_GROUP_USERS=$(getent group serviceusers | awk -F: '{print $4}' | tr ',' '\n')
-
-    # Also include 'root' and other valid login users (UID >= 1000 with real shell)
     SYSTEM_USERS=$(awk -F: '($3 == 0 || $3 >= 1000) && ($7 !~ /(false|nologin)$/) {print $1}' /etc/passwd)
 
-    # Combine and deduplicate
-    AVAILABLE_USERS=$(echo -e "${SERVICE_GROUP_USERS}\n${SYSTEM_USERS}\nroot" | sort -u)
+    # Combine and dedupe (ignore empties)
+    AVAILABLE_USERS=$(echo -e "${SERVICE_GROUP_USERS}\n${SYSTEM_USERS}\nroot" | sed '/^\s*$/d' | sort -u)
 
-    echo "Choose which user account the service should run under:"
-    select SELECTED_USER in $AVAILABLE_USERS; do
-        if [ -n "$SELECTED_USER" ]; then
-            break
+    echo "Choose which user account the service should run under (or press Enter to skip):"
+    # Show numbered list
+    idx=1
+    declare -a USER_LIST
+    while IFS= read -r u; do
+        USER_LIST[$idx]="$u"
+        echo "  [$idx] $u"
+        idx=$((idx+1))
+    done <<< "$AVAILABLE_USERS"
+    echo -n "Enter number (blank = don't set User/Group): "
+    read -r choice
+
+    if [[ -n "$choice" && "$choice" =~ ^[0-9]+$ && -n "${USER_LIST[$choice]}" ]]; then
+        RUN_AS_USER="${USER_LIST[$choice]}"
+        # Resolve primary group for the chosen user
+        RUN_AS_GROUP=$(id -gn "$RUN_AS_USER" 2>/dev/null || true)
+        PROMPTED=true
         else
-            echo "⚠️ Invalid choice. Please choose a valid number."
+        # Explicitly unset if skipped or invalid
+        unset RUN_AS_USER
+        unset RUN_AS_GROUP
         fi
-    done
-
-    RUN_AS_USER="$SELECTED_USER"
-    RUN_AS_GROUP=$(id -gn "$RUN_AS_USER")
-    PROMPTED=true
 fi
 
-
+# Optional working directory
 if [ -z "$WORKING_DIR" ]; then
-    DEFAULT_DIR="/home/${RUN_AS_USER}"
-    read -rp "Enter working directory for the service (default: $DEFAULT_DIR): " WORKING_DIR
-    WORKING_DIR="${WORKING_DIR:-$DEFAULT_DIR}"
+    echo -n "Enter working directory for the service (leave blank to unset): "
+    read -r WORKING_DIR_INPUT
 
-    # Validate it exists
-    while [ ! -d "$WORKING_DIR" ]; do
-        echo "❌ Directory does not exist: $WORKING_DIR"
-        read -rp "Please enter a valid working directory: " WORKING_DIR
+    if [ -n "$WORKING_DIR_INPUT" ]; then
+        # Validate exists; allow retry or skip
+        while [ ! -d "$WORKING_DIR_INPUT" ]; do
+            echo "❌ Directory does not exist: $WORKING_DIR_INPUT"
+            read -rp "Please enter a valid working directory (or leave blank to unset): " WORKING_DIR_INPUT
+            [ -z "$WORKING_DIR_INPUT" ] && break
     done
-
+        if [ -n "$WORKING_DIR_INPUT" ]; then
+            WORKING_DIR="$WORKING_DIR_INPUT"
     PROMPTED=true
+        else
+            unset WORKING_DIR
 fi
+    else
+        unset WORKING_DIR
+    fi
+fi
+
 
 if [ "$SERVICE_MODE" == "always" ] && [ -z "$RESTARTTIME" ]; then
     read -rp "Enter restart delay after failure (--restart), e.g., 3s: " RESTARTTIME
@@ -510,9 +519,9 @@ WantedBy=multi-user.target
 EOF
 
     echo "Make the srv-watcher.path daemon definition"
-    
+
     CLEANED_WATCHFOLDERS=$(echo "$WATCHFOLDERS" | tr ';' '\n' | sed '/^\s*$/d')
-    
+
     if [ -n "$CLEANED_WATCHFOLDERS" ]; then
         {
             echo "[Path]"
@@ -527,10 +536,10 @@ fi
 echo enable the service daemon "/etc/systemd/system/${SERVICE_NAME}.service"
 systemctl enable "/etc/systemd/system/${SERVICE_NAME}.service"
 # echo enabled the service daemon "/etc/systemd/system/${SERVICE_NAME}.service"
-if [ "$WATCHFOLDERS" != "" ]; 
-then 
+if [ "$WATCHFOLDERS" != "" ];
+then
     echo enable the watch daemon
-    systemctl enable "/etc/systemd/system/${SERVICE_NAME}-watcher.service"; 
+    systemctl enable "/etc/systemd/system/${SERVICE_NAME}-watcher.service";
     # systemctl start "${SERVICE_NAME}-watcher.service";
 fi
 echo reload the deamon
